@@ -1,0 +1,108 @@
+<!doctype html><html lang="ko"><head>
+<meta name="robots" content="noindex, nofollow">
+<meta charset="utf8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>주요국 성장·물가 전망</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --surface-2:#eef1f5;
+  --ink:#101a26; --ink-2:#465264; --muted:#768194;
+  --rule:#dce1e8; --rule-strong:#b9c1cc;
+  --accent:#163f8c; --accent-soft:#e3eaf7;
+  --fore:#eef3fc; --fore-ink:#163f8c;
+  --hot:#b4332f; --hot-soft:#fbe9e8;
+  --sans:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0e131a; --surface:#151c25; --surface-2:#1c2530;
+    --ink:#edf1f6; --ink-2:#b2bcc9; --muted:#8793a3;
+    --rule:#26303c; --rule-strong:#3a4656;
+    --accent:#8fb0ff; --accent-soft:#1d2a44;
+    --fore:#1b2740; --fore-ink:#bcd0ff;
+    --hot:#ef7b76; --hot-soft:#3a2120;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0e131a; --surface:#151c25; --surface-2:#1c2530;
+  --ink:#edf1f6; --ink-2:#b2bcc9; --muted:#8793a3;
+  --rule:#26303c; --rule-strong:#3a4656;
+  --accent:#8fb0ff; --accent-soft:#1d2a44;
+  --fore:#1b2740; --fore-ink:#bcd0ff;
+  --hot:#ef7b76; --hot-soft:#3a2120;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14.5px;line-height:1.55;margin:0}
+.wrap{max-width:760px;margin:0 auto;padding:0 16px 56px}
+header{padding:26px 0 14px}
+.eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+h1{font-size:clamp(22px,5vw,28px);line-height:1.2;font-weight:700;margin:0 0 8px;letter-spacing:-.01em}
+.stamp{font-size:12.5px;color:var(--ink-2)}
+.stamp a.calLink{color:var(--accent);text-decoration:none;font-weight:600}
+.stamp a.calLink:hover{text-decoration:underline}
+.warn{background:var(--hot-soft);border-left:4px solid var(--hot);
+  border-radius:10px;padding:11px 13px;margin:14px 0 0;font-size:12.5px}
+
+h2.sec{margin:28px 0 8px;font-size:15.5px;font-weight:700;
+  border-bottom:1px solid var(--rule-strong);padding-bottom:6px}
+h2.sec span{font-weight:400;font-size:12.5px;color:var(--muted);margin-left:8px}
+
+/* 가로로 밀지 않아도 다섯 해가 다 보여야 한다. 전망 두 해가 화면 밖으로
+   나가면 이 표를 볼 까닭이 없다 — 휴대폰에서 제일 먼저 볼 칸이다.
+   375px 에서 들어가도록 이름 칸을 좁히고 글자를 줄인다. */
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;
+  background:var(--surface);border:1px solid var(--rule);border-radius:12px}
+table{border-collapse:collapse;width:100%}
+th,td{padding:7px 3px;text-align:right;font-family:var(--mono);font-size:13px}
+@media (max-width:420px){
+  th,td{padding:7px 2px;font-size:12px}
+  tbody th{padding-left:9px} td:last-child{padding-right:9px}
+  tbody th .src{font-size:9.5px}
+}
+thead th{font-size:11.5px;color:var(--muted);font-weight:600;
+  border-bottom:1px solid var(--rule-strong);position:sticky;top:0;
+  background:var(--surface)}
+thead th:first-child,tbody th{text-align:left;font-family:var(--sans)}
+tbody th{font-weight:600;white-space:nowrap;padding-left:12px}
+tbody th .src{display:block;font-family:var(--sans);font-size:10.5px;
+  font-weight:400;color:var(--muted);margin-top:1px}
+tbody tr+tr th,tbody tr+tr td{border-top:1px solid var(--rule)}
+td.f{background:var(--fore);color:var(--fore-ink);font-weight:600}
+td:last-child{padding-right:12px}
+
+.legend{display:flex;gap:14px;font-size:11.5px;color:var(--muted);
+  margin:10px 0 0;flex-wrap:wrap;align-items:center}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;
+  background:var(--fore);border:1px solid var(--rule-strong);
+  margin-right:4px;vertical-align:-2px}
+.note{margin-top:30px;padding-top:16px;border-top:1px solid var(--rule-strong);
+  font-size:12px;color:var(--ink-2);line-height:1.65}
+.note b{color:var(--ink)} .note ul{margin:6px 0;padding-left:18px}
+</style></head><body><div class="wrap">
+<header>
+<p class="eyebrow">Bank of Korea Frankfurt</p>
+<h1>주요국 성장·물가 전망</h1>
+<p class="stamp">__STAMP__<br>
+<span style="color:var(--muted)">전망이 바뀐 날 __UPDATED__</span><br>
+<a class="calLink" href="https://tskang89.github.io/euro-chartpack/">주요국 경제 차트팩 →</a><br>
+<a class="calLink" href="https://tskang89.github.io/econ-calendar/">향후 1개월 주요 일정 →</a></p>
+</header>
+__WARN__
+<h2 class="sec">실질 GDP 성장률<span>연간 · % 전년비</span></h2>
+<div class="tw">__GDP__</div>
+
+<h2 class="sec">소비자물가 상승률<span>연간 · % 전년비</span></h2>
+<div class="tw">__CPI__</div>
+
+<div class="legend"><span><i></i>전망</span><span>그 밖은 실적</span></div>
+
+<div class="note">__NOTE__</div>
+</div>
+<script id="ops" type="application/json">__OPS__</script>
+</body></html>
