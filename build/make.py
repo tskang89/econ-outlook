@@ -183,6 +183,25 @@ def build(today: datetime.date, state: dict) -> tuple[str | None, dict]:
     # 뒤 두 해를 전망으로 본다. 한국은 한국은행이 밝힌 해를 따로 쓴다.
     meta["foreYears"] = years[-2:]
 
+    # **받지 못한 출처가 있으면 쪽을 건드리지 않는다.**
+    #
+    # 앞서는 그러지 않았다. AMECO 가 한 번 실패하면 유로 다섯 줄이 '–' 가
+    # 되는데 수치가 달라졌으므로 '바뀌었다'로 판정해 그 반쪽짜리 표를 올렸다.
+    # 변경 감지를 '새 전망이 나왔을 때'로 만들었는데 '받기에 실패했을 때'도
+    # 걸린 것이다 — 전송 오류 한 번에 멀쩡하던 표가 무너진다.
+    #
+    # 전망은 분기에 한 번 바뀌는 것이라 한 주 묵어도 탈이 없다. 반쪽짜리를
+    # 올리는 것보다 지난주 판을 그대로 두는 편이 낫다.
+    #
+    # 다만 쪽이 아직 없으면(첫 빌드) 경고를 띄운 채로라도 만들어 둔다.
+    if warn and OUTPUT.exists():
+        for w in warn:
+            log(f"  [보류] {w}")
+        log("\n받지 못한 출처가 있다 — 쪽을 건드리지 않는다(지난 판 유지).")
+        state = dict(state)
+        state["checked"] = today.isoformat()
+        return None, state
+
     fingerprint = json.dumps({"years": years, "data": data,
                               "ameco": meta.get("ameco"),
                               "bok": meta.get("bok")},
