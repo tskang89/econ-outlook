@@ -43,14 +43,17 @@ def axis(today: datetime.date) -> list[str]:
     return [str(today.year - 3 + i) for i in range(5)]
 
 
+# 차례. 주요국 경제 차트팩의 탭 차례(미국·중국·유로지역·일본·한국)와 같게
+# 두되, 유로 회원국을 유로지역 바로 밑에 붙인다. 두 쪽을 오가며 보는 것이라
+# 같은 차례라야 눈이 헤매지 않는다.
 ROWS = [
+    ("US", "미국", "imf"),
+    ("CN", "중국", "imf"),
     ("EA", "유로지역", "ameco"),
     ("DE", "독일", "ameco"),
     ("FR", "프랑스", "ameco"),
     ("IT", "이탈리아", "ameco"),
     ("ES", "스페인", "ameco"),
-    ("US", "미국", "imf"),
-    ("CN", "중국", "imf"),
     ("JP", "일본", "imf"),
     ("KR", "한국", "bok"),
 ]
