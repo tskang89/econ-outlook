@@ -122,6 +122,44 @@ def fmt(v) -> str:
     return "–" if v is None else f"{v:+.1f}".replace("+", "") if v < 0 else f"{v:.1f}"
 
 
+def weo_edition(d: datetime.date) -> str:
+    """오늘까지 나와 있는 IMF WEO 판. '2026.4' 꼴.
+
+    IMF 는 판을 밝히지 않는다 — DataMapper 응답에 날짜가 없고(확인함),
+    간행물 쪽은 403 으로 막혀 긁을 수도 없다. 그래서 발표 일정으로 센다.
+    WEO 는 봄·가을 연 두 번, 4월과 10월 중순에 나온다(2026년은 4월 14일,
+    10월 13일). 자료창구에 반영되는 데 며칠 걸리므로 20일을 넘겨 잡는다 —
+    **늦게 잡을지언정 아직 안 나온 판을 적지는 않는다.**
+    """
+    if d >= datetime.date(d.year, 10, 20):
+        return f"{d.year}.10"
+    if d >= datetime.date(d.year, 4, 20):
+        return f"{d.year}.4"
+    return f"{d.year - 1}.10"
+
+
+def ym(text: str | None) -> str:
+    """'2026년 8월' · 'Tue, 02 Jun 2026' 따위를 '2026.8' 로 줄인다."""
+    if not text:
+        return ""
+    import re as _re
+    m = _re.search(r"(20\d\d)\D{0,3}(\d{1,2})\s*월", text)
+    if m:                                        # 한국은행 '2026년 8월'
+        return f"{m.group(1)}.{int(m.group(2))}"
+    try:                                         # HTTP 날짜
+        from email.utils import parsedate_to_datetime
+        d = parsedate_to_datetime(text)
+        return f"{d.year}.{d.month}"
+    except Exception:                            # noqa: BLE001
+        pass
+    mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    m = _re.search(r"([A-Za-z]{3})\s+(20\d\d)", text)   # '02 Jun 2026'
+    if m and m.group(1).title() in mon:
+        return f"{m.group(2)}.{mon.index(m.group(1).title()) + 1}"
+    return text
+
+
 def ko_date(http_date: str | None) -> str:
     """AMECO 가 주는 HTTP 날짜를 우리 식으로 적는다. 못 읽으면 그대로 둔다."""
     if not http_date:
@@ -146,32 +184,14 @@ def ko_date(http_date: str | None) -> str:
         return http_date
 
 
-def sources_box(meta: dict, today: datetime.date) -> str:
-    """어느 기관의 언제 판인지를 표 위에 둔다.
-
-    세 기관을 섞어 쓰므로 판이 다 다르다. 한 줄에 몰아 적었더니 어느
-    날짜가 어디에 걸리는지 알 수 없었다. 날짜를 숫자로 따로 세워 둔다.
-
-    IMF 는 판을 밝히지 않는다 — DataMapper 응답에 날짜가 없다. 없는 것을
-    있는 척 적지 않고, 받은 날을 적는다.
-    """
-    rows = [
-        ("EU 집행위", "AMECO · 유로지역 · 독일 · 프랑스 · 이탈리아 · 스페인",
-         ko_date(meta.get("ameco")), "데이터베이스 갱신일"),
-        ("IMF", "World Economic Outlook · 미국 · 중국 · 일본 (한국 실적도)",
-         f"{today.year}.{today.month}.{today.day} 받음", "판을 밝히지 않는다"),
-        ("한국은행", "경제전망보고서 · 한국 (전망 두 해)",
-         meta.get("bok") or "", "발표 호"),
-    ]
-    out = []
-    for org, who, when, note in rows:
-        if not when:
-            when, note = "?", "받지 못했다"
-        out.append(f'<tr><td class="org">{esc(org)}'
-                   f'<span class="who">{esc(who)}</span></td>'
-                   f'<td class="when">{esc(when)}<i>{esc(note)}</i></td></tr>')
-    return ('<div class="vin"><table><tbody>' + "".join(out)
-            + "</tbody></table></div>")
+def sources_line(meta: dict) -> str:
+    """기관 이름 옆 괄호에 판을 년월로 적는다. 한 줄이라 휴대폰에 들어간다."""
+    bits = []
+    for label, key in (("EU 집행위", "ameco"), ("IMF WEO", "imf"),
+                       ("한국은행", "bok")):
+        v = ym(meta.get(key)) or "?"
+        bits.append(f"{esc(label)}(<b>{esc(v)}</b>)")
+    return "출처 " + " · ".join(bits)
 
 
 def table(data: dict, years: list[str], kind: str, meta: dict) -> str:
@@ -209,6 +229,16 @@ NOTE = """<b>읽는 법</b> 색이 든 칸이 <b>전망</b>이고 나머지는 �
 집행위가 봄·가을에 내는 European Economic Forecast 가 그대로 들어가는
 데이터베이스입니다.</li>
 <li><b>미국·중국·일본</b> — IMF World Economic Outlook.</li>
+</ul>
+<b>괄호 안은 전망 판입니다.</b> 세 기관의 판이 서로 다르므로 머리글에 년월로
+적었습니다. EU 집행위는 데이터베이스가 마지막으로 바뀐 날, 한국은행은
+보도자료의 발표 호입니다.
+<b>IMF 만 판을 밝히지 않습니다</b> — 자료창구 응답에 날짜가 없고 간행물
+쪽은 코드 접속을 막습니다. 그래서 WEO 가 해마다 4월·10월 중순에 나오는
+일정으로 셈하되, 자료창구에 반영되기까지 며칠 걸리는 것을 감안해
+<b>IMF 수치가 실제로 바뀐 날</b>에 판을 올려 적습니다. 늦게 적을지언정
+아직 나오지 않은 판을 적지는 않습니다.
+<ul>
 <li><b>한국</b> — 한국은행 경제전망. 전망 두 해만 한국은행 값이고, 과거
 실적은 IMF 값을 썼습니다.</li>
 </ul>
@@ -255,12 +285,25 @@ def build(today: datetime.date, state: dict) -> tuple[str | None, dict]:
         state["checked"] = today.isoformat()
         return None, state
 
+    # IMF 판은 숫자가 실제로 움직인 날에 갱신한다. 발표 일정만으로 적으면
+    # 자료창구가 아직 옛 판일 때 새 판이라고 적게 된다. IMF 에서 받는
+    # 블록만 따로 지문을 떠, 그것이 바뀐 날의 판을 적어 둔다.
+    imf_print = json.dumps({b: data.get(b) for b, _n, s in ROWS if s == "imf"},
+                           ensure_ascii=False, sort_keys=True)
+    if imf_print != state.get("imfPrint") or not state.get("imf"):
+        meta["imf"] = weo_edition(today)
+        if state.get("imfPrint"):
+            log(f"  IMF 수치가 바뀌었다 — 판을 {meta['imf']} 로 적는다")
+    else:
+        meta["imf"] = state["imf"]
+
     fingerprint = json.dumps({"years": years, "data": data,
                               "ameco": meta.get("ameco"),
                               "bok": meta.get("bok")},
                              ensure_ascii=False, sort_keys=True)
     changed = fingerprint != state.get("fingerprint")
     state = {"fingerprint": fingerprint, "bokAnchor": meta.get("bokAnchor"),
+             "imfPrint": imf_print, "imf": meta["imf"],
              "checked": today.isoformat(),
              "updated": (today.isoformat() if changed
                          else state.get("updated"))}
@@ -268,7 +311,7 @@ def build(today: datetime.date, state: dict) -> tuple[str | None, dict]:
         log("\n지난 판과 같다 — 쪽을 다시 쓰지 않는다.")
         return None, state
 
-    sources_html = sources_box(meta, today)
+    sources_html = sources_line(meta)
     warn_html = ""
     if warn:
         warn_html = ('<div class="warn"><b>일부를 받지 못했습니다.</b> '
