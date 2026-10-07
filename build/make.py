@@ -129,9 +129,21 @@ def ko_date(http_date: str | None) -> str:
     try:
         from email.utils import parsedate_to_datetime
         d = parsedate_to_datetime(http_date)
+        return f"{d.year}년 {d.month}월 {d.day}일"
     except Exception:                      # noqa: BLE001
+        pass
+    # ameco.vintage() 가 Last-Modified 를 16자로 잘라 보내 시각이 없다
+    # ("Tue, 02 Jun 2026"). 그러면 위 해석기가 거절한다.
+    import re as _re
+    m = _re.search(r"(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})", http_date)
+    if not m:
         return http_date
-    return f"{d.year}년 {d.month}월 {d.day}일"
+    mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    try:
+        return f"{m.group(3)}년 {mon.index(m.group(2).title()) + 1}월 {int(m.group(1))}일"
+    except ValueError:
+        return http_date
 
 
 def sources_box(meta: dict, today: datetime.date) -> str:
