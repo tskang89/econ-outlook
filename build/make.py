@@ -29,7 +29,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
 import ameco                                                   # noqa: E402
 import bokfc                                                   # noqa: E402
-import imffc                                                   # noqa: E402
+import imffc
+import jscheck                                         # noqa: E402                                                   # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 TEMPLATE = ROOT / "template.html"
@@ -119,6 +120,46 @@ def collect(years: list[str]) -> tuple[dict, dict, list[str]]:
 
 def fmt(v) -> str:
     return "–" if v is None else f"{v:+.1f}".replace("+", "") if v < 0 else f"{v:.1f}"
+
+
+def ko_date(http_date: str | None) -> str:
+    """AMECO 가 주는 HTTP 날짜를 우리 식으로 적는다. 못 읽으면 그대로 둔다."""
+    if not http_date:
+        return ""
+    try:
+        from email.utils import parsedate_to_datetime
+        d = parsedate_to_datetime(http_date)
+    except Exception:                      # noqa: BLE001
+        return http_date
+    return f"{d.year}년 {d.month}월 {d.day}일"
+
+
+def sources_box(meta: dict, today: datetime.date) -> str:
+    """어느 기관의 언제 판인지를 표 위에 둔다.
+
+    세 기관을 섞어 쓰므로 판이 다 다르다. 한 줄에 몰아 적었더니 어느
+    날짜가 어디에 걸리는지 알 수 없었다. 날짜를 숫자로 따로 세워 둔다.
+
+    IMF 는 판을 밝히지 않는다 — DataMapper 응답에 날짜가 없다. 없는 것을
+    있는 척 적지 않고, 받은 날을 적는다.
+    """
+    rows = [
+        ("EU 집행위", "AMECO · 유로지역 · 독일 · 프랑스 · 이탈리아 · 스페인",
+         ko_date(meta.get("ameco")), "데이터베이스 갱신일"),
+        ("IMF", "World Economic Outlook · 미국 · 중국 · 일본 (한국 실적도)",
+         f"{today.year}.{today.month}.{today.day} 받음", "판을 밝히지 않는다"),
+        ("한국은행", "경제전망보고서 · 한국 (전망 두 해)",
+         meta.get("bok") or "", "발표 호"),
+    ]
+    out = []
+    for org, who, when, note in rows:
+        if not when:
+            when, note = "?", "받지 못했다"
+        out.append(f'<tr><td class="org">{esc(org)}'
+                   f'<span class="who">{esc(who)}</span></td>'
+                   f'<td class="when">{esc(when)}<i>{esc(note)}</i></td></tr>')
+    return ('<div class="vin"><table><tbody>' + "".join(out)
+            + "</tbody></table></div>")
 
 
 def table(data: dict, years: list[str], kind: str, meta: dict) -> str:
@@ -215,15 +256,14 @@ def build(today: datetime.date, state: dict) -> tuple[str | None, dict]:
         log("\n지난 판과 같다 — 쪽을 다시 쓰지 않는다.")
         return None, state
 
-    stamp = (f'{meta.get("bok") or "?"} 한국은행 · '
-             f'EU 집행위 AMECO {meta.get("ameco") or "?"} · IMF WEO')
+    sources_html = sources_box(meta, today)
     warn_html = ""
     if warn:
         warn_html = ('<div class="warn"><b>일부를 받지 못했습니다.</b> '
                      + " / ".join(esc(w) for w in warn) + "</div>")
 
     page = TEMPLATE.read_text(encoding="utf-8")
-    page = page.replace("__STAMP__", esc(stamp))
+    page = page.replace("__SOURCES__", sources_html)
     page = page.replace("__UPDATED__", esc(state["updated"] or today.isoformat()))
     page = page.replace("__WARN__", warn_html)
     page = page.replace("__GDP__", table(data, years, "gdp", meta))
@@ -271,6 +311,10 @@ def main() -> int:
                      encoding="utf-8")
     if page is None:
         return 0
+
+    # 쪽을 쓰기 전에 자바스크립트가 성한지 본다. 깨졌으면 여기서 멈춘다 —
+    # 깨진 쪽을 올리느니 어제 쪽이 그대로 떠 있는 편이 낫다(2026-10-07).
+    jscheck.must_be_sound(page, log)
     OUTPUT.write_text(page, encoding="utf-8")
     log(f"index.html 갱신 — {len(page):,}자")
     return 0
