@@ -29,6 +29,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
 import ameco                                                   # noqa: E402
 import bokfc                                                   # noqa: E402
+import ecbproj
+import gd
 import imffc
 import jscheck                                         # noqa: E402                                                   # noqa: E402
 
@@ -50,15 +52,16 @@ def axis(today: datetime.date) -> list[str]:
 ROWS = [
     ("US", "미국", "imf"),
     ("CN", "중국", "imf"),
-    ("EA", "유로지역", "ameco"),
-    ("DE", "독일", "ameco"),
+    ("EA", "유로지역", "ecb"),
+    ("DE", "독일", "gd"),
     ("FR", "프랑스", "ameco"),
     ("IT", "이탈리아", "ameco"),
     ("ES", "스페인", "ameco"),
     ("JP", "일본", "imf"),
     ("KR", "한국", "bok"),
 ]
-SRC_LABEL = {"ameco": "EU 집행위", "imf": "IMF WEO", "bok": "한국은행"}
+SRC_LABEL = {"ameco": "EU 집행위", "imf": "IMF WEO", "bok": "한국은행",
+             "ecb": "ECB", "gd": "공동경제진단"}
 
 
 def log(msg: str = "") -> None:
@@ -94,6 +97,48 @@ def collect(years: list[str]) -> tuple[dict, dict, list[str]]:
     except imffc.ImfError as exc:
         warn.append(f"IMF 전망을 받지 못했다 — {exc}")
         log(f"  [실패] IMF — {exc}")
+
+    # 유로지역 — ECB 스태프 전망. 분기마다 새로 내므로 AMECO(봄·가을)보다
+    # 늘 최신이다. **전망 두 해만 덮는다** — ECB 표에는 과거가 짧다.
+    try:
+        proj = ecbproj.forecast()
+        meta["ecb"] = proj["issue"]
+        row = data.setdefault("EA", {"gdp": [None] * len(years),
+                                     "cpi": [None] * len(years)})
+        for i, y in enumerate(years[-2:], start=len(years) - 2):
+            yi = int(y)
+            if yi in proj["gdp"]:
+                row["gdp"][i] = proj["gdp"][yi]
+            if yi in proj["cpi"]:
+                row["cpi"][i] = proj["cpi"][yi]
+        log(f"  ECB 전망        {proj['issue']}  성장 "
+            f"{[proj['gdp'].get(int(y)) for y in years[-2:]]} 물가 "
+            f"{[proj['cpi'].get(int(y)) for y in years[-2:]]}")
+    except ecbproj.ProjError as exc:
+        warn.append(f"ECB 전망을 받지 못했다 — {exc}")
+        log(f"  [실패] ECB 전망 — {exc}")
+
+    # 독일 — 공동경제진단. 다섯 해를 모두 덮는다. 전망만이 아니라 **실적도**
+    # AMECO 보다 새롭다: 2026-10 기준 AMECO 는 2024년을 -0.5% 로 두고 있는데
+    # 독일이 국민계정을 개편해 0.0% 가 되었다.
+    try:
+        g = gd.forecast()
+        meta["gd"] = g["issue"]
+        meta["gdUrl"] = g["url"]
+        row = data.setdefault("DE", {"gdp": [None] * len(years),
+                                     "cpi": [None] * len(years)})
+        for i, y in enumerate(years):
+            yi = int(y)
+            if yi in g["gdp"]:
+                row["gdp"][i] = g["gdp"][yi]
+            if yi in g["cpi"]:
+                row["cpi"][i] = g["cpi"][yi]
+        log(f"  공동경제진단    {g['issue']}  성장 "
+            f"{[g['gdp'].get(int(y)) for y in years]} 물가 "
+            f"{[g['cpi'].get(int(y)) for y in years]}")
+    except gd.GDError as exc:
+        warn.append(f"공동경제진단을 받지 못했다 — {exc}")
+        log(f"  [실패] 공동경제진단 — {exc}")
 
     try:
         bok = bokfc.latest(meta.get("bokAnchor"))
@@ -203,7 +248,8 @@ def freshness(state: dict, today: datetime.date) -> str:
 def sources_line(meta: dict) -> str:
     """기관 이름 옆 괄호에 판을 년월로 적는다. 한 줄이라 휴대폰에 들어간다."""
     bits = []
-    for label, key in (("EU 집행위", "ameco"), ("IMF WEO", "imf"),
+    for label, key in (("ECB", "ecb"), ("공동경제진단", "gd"),
+                       ("EU 집행위", "ameco"), ("IMF WEO", "imf"),
                        ("한국은행", "bok")):
         v = ym(meta.get(key)) or "?"
         bits.append(f"{esc(label)}(<b>{esc(v)}</b>)")
@@ -241,7 +287,15 @@ NOTE = """<b>읽는 법</b> 색이 든 칸이 <b>전망</b>이고 나머지는 �
 <b>출처가 나라마다 다릅니다.</b> 섞어 쓴 것이 아니라 각 나라를 가장 잘 아는
 곳을 고른 것입니다. 표의 국가 이름 아래에 어디서 왔는지 적었습니다.
 <ul>
-<li><b>유로지역·독일·프랑스·이탈리아·스페인</b> — EU 집행위 AMECO.
+<li><b>유로지역</b> — ECB 스태프 거시경제 전망. 분기마다(3·6·9·12월)
+새로 내므로 가장 빠릅니다. <b>전망 두 해만</b> ECB 값이고 과거 실적은
+아래 AMECO 를 썼습니다.</li>
+<li><b>독일</b> — 공동경제진단(Gemeinschaftsdiagnose). ifo·DIW·IfW·IWH·RWI
+다섯 연구소가 연방정부 의뢰로 봄·가을에 내는 것으로, 독일에서 실제로
+인용되는 기준입니다. 다섯 해를 모두 이 값으로 썼습니다 — 전망만이 아니라
+<b>실적도</b> AMECO 보다 새롭습니다(국민계정 개편이 반영돼 2024년이
+-0.5%가 아니라 0.0%입니다).</li>
+<li><b>프랑스·이탈리아·스페인</b>과 유로지역 과거 실적 — EU 집행위 AMECO.
 집행위가 봄·가을에 내는 European Economic Forecast 가 그대로 들어가는
 데이터베이스입니다.</li>
 <li><b>미국·중국·일본</b> — IMF World Economic Outlook.</li>
@@ -258,6 +312,10 @@ NOTE = """<b>읽는 법</b> 색이 든 칸이 <b>전망</b>이고 나머지는 �
 <li><b>한국</b> — 한국은행 경제전망. 전망 두 해만 한국은행 값이고, 과거
 실적은 IMF 값을 썼습니다.</li>
 </ul>
+<b>독일 물가만 기준이 다릅니다.</b> 공동경제진단은 독일 소비자물가(VPI)를
+쓰고 나머지 나라는 HICP(유럽 통일 기준)입니다. 둘은 품목 가중치가 조금
+달라 끝자리가 어긋날 수 있습니다.
+<br><br>
 <b>AMECO 는 수준 계열만 줍니다.</b> 성장률·물가상승률은 전년비로 계산한
 것이라 집행위가 공표한 숫자와 <b>끝자리 반올림이 다를 수 있습니다.</b>
 같은 계열에서 낸 것이라 값이 어긋나지는 않습니다. IMF 와 한국은행은 상승률을
@@ -316,6 +374,7 @@ def build(today: datetime.date, state: dict,
 
     fingerprint = json.dumps({"years": years, "data": data,
                               "ameco": meta.get("ameco"),
+                              "ecb": meta.get("ecb"), "gd": meta.get("gd"),
                               "bok": meta.get("bok")},
                              ensure_ascii=False, sort_keys=True)
     # **움직인 것**과 **다시 쓰는 것**을 가른다. --force 는 틀을 고쳤을 때
