@@ -184,6 +184,22 @@ def ko_date(http_date: str | None) -> str:
         return http_date
 
 
+def freshness(state: dict, today: datetime.date) -> str:
+    """언제 보았고 언제 바뀌었는지를 헷갈리지 않게 적는다.
+
+    '전망이 바뀐 날 2026-10-07' 로만 적었더니 '오늘 찾아본 날' 로 읽혔다
+    (소장님, 2026-10-07). 둘은 다른 날일 수 있고, 읽는 사람이 알고 싶은
+    것은 '오늘치인가'와 '그새 움직였나' 둘 다다. 그래서 둘을 다 적는다.
+    """
+    checked = state.get("checked") or today.isoformat()
+    updated = state.get("updated")
+    if not updated:
+        return f"{esc(checked)} 확인"
+    if updated == checked:
+        return f"{esc(checked)} 확인 — <b>이날 전망치가 바뀌었습니다</b>"
+    return (f"{esc(checked)} 확인 · 전망치는 {esc(updated)} 이후 그대로")
+
+
 def sources_line(meta: dict) -> str:
     """기관 이름 옆 괄호에 판을 년월로 적는다. 한 줄이라 휴대폰에 들어간다."""
     bits = []
@@ -256,7 +272,8 @@ NOTE = """<b>읽는 법</b> 색이 든 칸이 <b>전망</b>이고 나머지는 �
 줄로 읽히기 때문입니다."""
 
 
-def build(today: datetime.date, state: dict) -> tuple[str | None, dict]:
+def build(today: datetime.date, state: dict,
+          force: bool = False) -> tuple[str | None, dict]:
     years = axis(today)
     log(f"전망 수집 — {years[0]}~{years[-1]}")
     data, meta, warn = collect(years)
@@ -301,15 +318,21 @@ def build(today: datetime.date, state: dict) -> tuple[str | None, dict]:
                               "ameco": meta.get("ameco"),
                               "bok": meta.get("bok")},
                              ensure_ascii=False, sort_keys=True)
-    changed = fingerprint != state.get("fingerprint")
+    # **움직인 것**과 **다시 쓰는 것**을 가른다. --force 는 틀을 고쳤을 때
+    # 쪽을 새로 뽑으려고 쓰는 것이지 전망이 바뀐 것이 아니다. 둘을 한
+    # 깃발로 묶어 두었더니, 2026-10-07 에 틀을 손보느라 --force 를 몇 번
+    # 돌린 것이 '전망이 바뀐 날 2026-10-07' 로 찍혔다. 숫자는 그대로였다.
+    moved = fingerprint != state.get("fingerprint")
     state = {"fingerprint": fingerprint, "bokAnchor": meta.get("bokAnchor"),
              "imfPrint": imf_print, "imf": meta["imf"],
              "checked": today.isoformat(),
-             "updated": (today.isoformat() if changed
+             "updated": (today.isoformat() if moved
                          else state.get("updated"))}
-    if not changed:
+    if not moved and not force:
         log("\n지난 판과 같다 — 쪽을 다시 쓰지 않는다.")
         return None, state
+    if not moved:
+        log("\n수치는 그대로다 — 틀만 다시 쓴다(--force).")
 
     sources_html = sources_line(meta)
     warn_html = ""
@@ -319,13 +342,14 @@ def build(today: datetime.date, state: dict) -> tuple[str | None, dict]:
 
     page = TEMPLATE.read_text(encoding="utf-8")
     page = page.replace("__SOURCES__", sources_html)
-    page = page.replace("__UPDATED__", esc(state["updated"] or today.isoformat()))
+    page = page.replace("__UPDATED__", freshness(state, today))
     page = page.replace("__WARN__", warn_html)
     page = page.replace("__GDP__", table(data, years, "gdp", meta))
     page = page.replace("__CPI__", table(data, years, "cpi", meta))
     page = page.replace("__NOTE__", NOTE)
     page = page.replace("__OPS__", ops_blob(today, years, data, meta, warn))
-    log(f"\n바뀌었다 — 쪽을 새로 쓴다 ({len(ROWS)}개국)")
+    log(f"\n{'수치가 바뀌었다' if moved else '수치는 그대로'} — "
+        f"쪽을 새로 쓴다 ({len(ROWS)}개국)")
     return page, state
 
 
@@ -354,10 +378,7 @@ def main() -> int:
     state = {}
     if STATE.exists():
         state = json.loads(STATE.read_text(encoding="utf-8"))
-    if args.force:
-        state = {k: v for k, v in state.items() if k != "fingerprint"}
-
-    page, new_state = build(today, state)
+    page, new_state = build(today, state, force=args.force)
     if args.check:
         log("--check: 파일을 쓰지 않았다.")
         return 0
