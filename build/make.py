@@ -173,12 +173,24 @@ def weo_edition(d: datetime.date) -> str:
     IMF 는 판을 밝히지 않는다 — DataMapper 응답에 날짜가 없고(확인함),
     간행물 쪽은 403 으로 막혀 긁을 수도 없다. 그래서 발표 일정으로 센다.
     WEO 는 봄·가을 연 두 번, 4월과 10월 중순에 나온다(2026년은 4월 14일,
-    10월 13일). 자료창구에 반영되는 데 며칠 걸리므로 20일을 넘겨 잡는다 —
-    **늦게 잡을지언정 아직 안 나온 판을 적지는 않는다.**
+    10월 13일).
+
+    앞서는 20일을 넘겨 잡았다. '아직 안 나온 판을 적지 말자'는 뜻이었는데,
+    2026-10-13 에 그것이 거꾸로 틀렸다 — 그날 10월 판 숫자가 이미 들어왔는데
+    쪽에는 '2026.4' 라고 적혔다. 늦게 적는 것이 안전한 쪽이라고 보았으나,
+    **새 숫자에 옛 판을 붙이는 것은 그냥 거짓말이다.**
+
+    이 함수는 **숫자가 바뀐 것을 확인한 자리에서만** 불린다(아래 imfPrint
+    비교). 그러니 '나왔는가' 는 이미 자료가 답했고, 여기서 가릴 것은 '둘 중
+    어느 판인가' 뿐이다. 그래서 달 첫날로 가른다. 10월 이후면 가을 판,
+    4월 이후면 봄 판, 그 앞이면 지난해 가을 판이다.
+
+    1·7월의 WEO Update 는 따로 세지 않는다. 자료창구가 담고 있는 것은
+    직전 정식 판이고, Update 는 일부 수치만 손보기 때문이다.
     """
-    if d >= datetime.date(d.year, 10, 20):
+    if d.month >= 10:
         return f"{d.year}.10"
-    if d >= datetime.date(d.year, 4, 20):
+    if d.month >= 4:
         return f"{d.year}.4"
     return f"{d.year - 1}.10"
 
@@ -372,8 +384,12 @@ def build(today: datetime.date, state: dict,
     else:
         meta["imf"] = state["imf"]
 
+    # 판 이름도 지문에 넣는다. 쪽에 적히는 것은 모두 여기 들어와야 한다 —
+    # 2026-10-13 에 IMF 판만 빠져 있어, 판을 2026.4 에서 2026.10 으로 고쳐도
+    # '지난 판과 같다' 며 쪽을 다시 쓰지 않았다. 화면에는 열흘 전 판 이름이
+    # 그대로 붙어 있었다.
     fingerprint = json.dumps({"years": years, "data": data,
-                              "ameco": meta.get("ameco"),
+                              "ameco": meta.get("ameco"), "imf": meta.get("imf"),
                               "ecb": meta.get("ecb"), "gd": meta.get("gd"),
                               "bok": meta.get("bok")},
                              ensure_ascii=False, sort_keys=True)
